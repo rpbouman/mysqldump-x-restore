@@ -195,7 +195,7 @@ CREATE VIEW <xsl:call-template name="quote-identifier"><xsl:with-param name="ide
             or  starts-with($type, 'blob')
             or  starts-with($type, 'decimal')
             or  starts-with($type, 'double')
-            or  starts-with($type, 'floor')
+            or  starts-with($type, 'float')
             or  starts-with($type, 'longblob')
             or  starts-with($type, 'mediumblob')
             or  starts-with($type, 'mediumint')
