@@ -107,6 +107,7 @@ USE <xsl:call-template name="quote-identifier"><xsl:with-param name="identifier"
 <xsl:if test="$flag-data">
 <xsl:if test="$transaction-level = $TRANSACTION_LEVEL_DATABASE"><xsl:value-of select="$START_TRANSACTION"/></xsl:if>
     <xsl:apply-templates select="table_data[row]"/>
+    <xsl:apply-templates select="table[row]"/>
 <xsl:if test="$transaction-level = $TRANSACTION_LEVEL_DATABASE"><xsl:value-of select="$COMMIT"/></xsl:if>    
 </xsl:if>
 </xsl:template>
@@ -258,6 +259,72 @@ CREATE VIEW <xsl:call-template name="quote-identifier"><xsl:with-param name="ide
     </xsl:choose>
 </xsl:template>
 
+<!--
+
+    Added this to cope with "steve"'s dump format, see: 
+    http://rpbouman.blogspot.com/2010/04/restoring-xml-formatted-mysql-dumps.html?showComment=1295382737293#c8998217029331514581
+
+    For referernce, this is the structure:
+    
+    <mysqldump>
+    <database name="mediaDb" schemaVer="1.4.2">
+        <table name="advisoryTable">
+        </table>
+        <table name="aggregateTable">
+            <row>
+                <field name="aggregateMID">737</field>
+                <field name="MID">17800</field>
+                <field name="sequenceNum">1</field>
+            </row>
+            <row>
+                <field name="aggregateMID">737</field>
+                <field name="MID">15850</field>
+                <field name="sequenceNum">2</field>
+            </row>
+            <row>
+                <field name="aggregateMID">737</field>
+                <field name="MID">15858</field>
+                <field name="sequenceNum">3</field>
+            </row>
+        </table>
+    </database>
+    </mysqldump>
+    
+-->
+<xsl:template match="table[row]">
+    <xsl:variable name="name" select="@name"/>
+    <xsl:variable name="quoted-table-name">
+        <xsl:call-template name="quote-identifier">
+            <xsl:with-param name="identifier" select="$name"/>
+        </xsl:call-template>
+    </xsl:variable>
+    <xsl:variable name="row-fields" select="row[1]/field"/>
+    <xsl:variable name="column-name-list">(<xsl:for-each select="$row-fields">
+            <xsl:if test="position()!=1">, </xsl:if>
+            <xsl:call-template name="quote-identifier">
+                <xsl:with-param name="identifier" select="@name"/>
+            </xsl:call-template>
+        </xsl:for-each>)</xsl:variable>
+    <xsl:variable name="rows" select="row"/>
+    <xsl:variable name="quote-field-flags">
+        <xsl:for-each select="$row-fields">
+            <xsl:variable name="field-name" select="@name"/>
+            <xsl:choose>
+                <xsl:when test="$rows[field[@name=$field-name and text()!='' and string(number(text()))='NaN']]">1</xsl:when>
+                <xsl:otherwise>0</xsl:otherwise>
+            </xsl:choose>
+        </xsl:for-each>
+    </xsl:variable>
+<xsl:for-each select="row">
+    <xsl:call-template name="row">
+        <xsl:with-param name="row" select="."/>
+        <xsl:with-param name="quoted-table-name" select="$quoted-table-name"/>
+        <xsl:with-param name="column-name-list" select="$column-name-list"/>
+        <xsl:with-param name="quote-field-flags" select="$quote-field-flags"/>
+    </xsl:call-template>
+</xsl:for-each>
+</xsl:template>
+
 <xsl:template match="table_data[row]">
     <xsl:variable name="name" select="@name"/>
     <xsl:variable name="quoted-table-name">
@@ -345,7 +412,7 @@ INSERT INTO <xsl:value-of select="$quoted-table-name"/><xsl:text> </xsl:text><xs
             <xsl:if test="position()!=1">, </xsl:if>
             <xsl:choose>
                 <xsl:when test="@xsi:nil='true'">NULL</xsl:when>
-                <xsl:when test="$flag='1'">'<xsl:call-template name="escape-quotes"><xsl:with-param name="value" select="text()"/></xsl:call-template>'</xsl:when>                
+                <xsl:when test="$flag='1'">'<xsl:call-template name="escape-quotes"><xsl:with-param name="value" select="text()"/></xsl:call-template>'</xsl:when>
                 <xsl:otherwise><xsl:if test="$flag='2'">0x</xsl:if><xsl:value-of select="text()"/></xsl:otherwise>
             </xsl:choose>
         </xsl:for-each>)<xsl:if test="$flag-single-inserts or position()=last()">;</xsl:if>
